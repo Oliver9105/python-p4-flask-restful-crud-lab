@@ -3,6 +3,7 @@
 from flask import Flask, jsonify, request, make_response
 from flask_migrate import Migrate
 from flask_restful import Api, Resource
+from sqlalchemy.orm import Session
 
 from models import db, Plant
 
@@ -15,7 +16,6 @@ migrate = Migrate(app, db)
 db.init_app(app)
 
 api = Api(app)
-
 
 class Plants(Resource):
 
@@ -46,6 +46,30 @@ class PlantByID(Resource):
     def get(self, id):
         plant = Plant.query.filter_by(id=id).first().to_dict()
         return make_response(jsonify(plant), 200)
+
+    def patch(self, id):
+        data = request.get_json()
+        with Session(db.engine) as session:
+            plant = session.get(Plant, id)
+            if plant:
+                if 'is_in_stock' in data:
+                    plant.is_in_stock = data['is_in_stock']
+                    session.commit()
+                    return make_response(jsonify(plant.to_dict()), 200)
+                else:
+                    return make_response({"error": "Invalid data"}, 400)
+            else:
+                return make_response({"error": "Plant not found"}, 404)
+
+    def delete(self, id):
+        with Session(db.engine) as session:
+            plant = session.get(Plant, id)
+            if plant:
+                session.delete(plant)
+                session.commit()
+                return '', 204
+            else:
+                return make_response({"error": "Plant not found"}, 404)
 
 
 api.add_resource(PlantByID, '/plants/<int:id>')
